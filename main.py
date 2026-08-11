@@ -1,13 +1,37 @@
+import os
+from contextlib import asynccontextmanager
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from infrastructure.adapters.agent.gemini_llm_adapter import GeminiLLMAdapter
+from infrastructure.adapters.agent.mock_llm_adapter import MockLLMAdapter
+from infrastructure.adapters.in_memory_chat_repository import InMemoryChatRepository
 from infrastructure.api.v1.chat_router import router as chat_router
 from infrastructure.config.settings import settings
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    load_dotenv()
+    print("Loading depedencies with lifespan...")
+    app.state.chat_repository = InMemoryChatRepository()
+    
+    api_key = os.getenv("GEMINI_API_KEY")
+    if api_key:
+        app.state.llm_service = GeminiLLMAdapter(api_key=api_key)
+    else:
+        app.state.llm_service = MockLLMAdapter(bot_name=settings.BOT_NAME)
+    
+    yield
+    print("Closing application...")
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     description="Blueprint for FastAPI Hexagonal Architecture with Domain, Application, and Infrastructure layers.",
+    lifespan=lifespan,
 )
 
 # CORS configuration
@@ -37,3 +61,4 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+

@@ -30,6 +30,11 @@ class GeminiLLMAdapter(LLMServicePort):
 
     async def generate_response(self, prompt: str, history: list[ChatMessage]) -> str:
         self._ensure_client()
+
+        print("\n==================================")
+        print("HISTORY", history)
+        print("PROMPT", prompt)
+        print("==================================\n")
         
         response = await self.client.aio.models.generate_content(
             model=self.model_name,
@@ -42,7 +47,7 @@ class GeminiLLMAdapter(LLMServicePort):
                     disable=True
                 )
             ),
-            contents=prompt,
+            contents=[prompt.content for prompt in history] + [prompt],
         )
         
         return response.text

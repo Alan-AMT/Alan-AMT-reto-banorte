@@ -22,6 +22,10 @@ class SendChatMessageUseCase:
         session = await self.chat_repository.get_session(session_id)
         if not session:
             session = ChatSession(session_id=session_id)
+        
+        print("\n==================================")
+        print("SESSION", session)
+        print("==================================\n")
 
         # 2. Append user message
         session.add_message(role="user", content=request.message)
@@ -31,6 +35,7 @@ class SendChatMessageUseCase:
             prompt=request.message,
             history=session.messages[:-1],  # history prior to current message
         )
+        # assistant_reply = "hola"
 
         # 4. Append assistant response
         session.add_message(role="assistant", content=assistant_reply)
