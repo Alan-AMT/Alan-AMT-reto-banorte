@@ -27,6 +27,7 @@ async def chat_endpoint(
             detail=str(exc),
         )
     except Exception as exc:
+        print(exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred processing your request.",

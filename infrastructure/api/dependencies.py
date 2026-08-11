@@ -1,3 +1,4 @@
+from infrastructure.adapters.agent.gemini_llm_adapter import GeminiLLMAdapter
 from functools import lru_cache
 from fastapi import Depends
 
@@ -5,7 +6,7 @@ from application.use_cases.chat_use_case import SendChatMessageUseCase
 from domain.ports.chat_repository_port import ChatRepositoryPort
 from domain.ports.llm_service_port import LLMServicePort
 from infrastructure.adapters.in_memory_chat_repository import InMemoryChatRepository
-from infrastructure.adapters.mock_llm_adapter import MockLLMAdapter
+from infrastructure.adapters.agent.mock_llm_adapter import MockLLMAdapter
 from infrastructure.config.settings import settings
 
 # Global singletons for in-memory adapters (for demo/development)
@@ -18,7 +19,7 @@ def get_chat_repository() -> ChatRepositoryPort:
 
 @lru_cache()
 def get_llm_service() -> LLMServicePort:
-    return MockLLMAdapter(bot_name=settings.BOT_NAME)
+    return GeminiLLMAdapter()
 
 
 def get_send_chat_message_use_case(
