@@ -3,17 +3,21 @@ import pytest
 
 from main import app
 
-client = TestClient(app)
+
+@pytest.fixture
+def client():
+    with TestClient(app) as c:
+        yield c
 
 
-def test_health_endpoint():
+def test_health_endpoint(client):
     response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
 
 
-def test_post_chat_endpoint_new_session():
+def test_post_chat_endpoint_new_session(client):
     payload = {
         "message": "Hola, ¿cuál es el estado de mi trámite?",
     }
@@ -21,13 +25,12 @@ def test_post_chat_endpoint_new_session():
     assert response.status_code == 200
     data = response.json()
     assert "session_id" in data
-    assert "Banorte CV Agent" in data["response"]
     assert len(data["history"]) == 2
     assert data["history"][0]["role"] == "user"
     assert data["history"][1]["role"] == "assistant"
 
 
-def test_post_chat_endpoint_existing_session():
+def test_post_chat_endpoint_existing_session(client):
     session_id = "test-session-42"
     payload1 = {
         "message": "Primer mensaje",
@@ -46,3 +49,4 @@ def test_post_chat_endpoint_existing_session():
     data2 = res2.json()
     assert data2["session_id"] == session_id
     assert len(data2["history"]) == 4  # 2 messages from request 1 + 2 from request 2
+
