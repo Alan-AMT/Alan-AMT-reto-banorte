@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "development"
     BOT_NAME: str = "Banorte CV Agent"
+    PINECONE_KEY: str = ""
+    PINECONE_INDEX_NAME: str = "banorte-rag-index"
 
     model_config = SettingsConfigDict(
         env_file=".env",

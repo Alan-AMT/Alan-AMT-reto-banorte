@@ -1,8 +1,10 @@
 import uuid
+from typing import List, Optional
 from application.dtos.chat_dto import ChatMessageDTO, ChatRequestDTO, ChatResponseDTO
 from domain.entities.chat import ChatSession
 from domain.ports.chat_repository_port import ChatRepositoryPort
 from domain.ports.llm_service_port import LLMServicePort
+from domain.ports.tool_port import ToolPort
 
 
 class SendChatMessageUseCase:
@@ -11,9 +13,11 @@ class SendChatMessageUseCase:
         self,
         chat_repository: ChatRepositoryPort,
         llm_service: LLMServicePort,
+        tools: Optional[List[ToolPort]] = None,
     ):
         self.chat_repository = chat_repository
         self.llm_service = llm_service
+        self.tools = tools or []
 
     async def execute(self, request: ChatRequestDTO) -> ChatResponseDTO:
         session_id = request.session_id or str(uuid.uuid4())
@@ -22,10 +26,6 @@ class SendChatMessageUseCase:
         session = await self.chat_repository.get_session(session_id)
         if not session:
             session = ChatSession(session_id=session_id)
-        
-        print("\n==================================")
-        print("SESSION", session)
-        print("==================================\n")
 
         # 2. Append user message
         session.add_message(role="user", content=request.message)
@@ -34,6 +34,7 @@ class SendChatMessageUseCase:
         assistant_reply = await self.llm_service.generate_response(
             prompt=request.message,
             history=session.messages[:-1],  # history prior to current message
+            tools=self.tools,
         )
         # assistant_reply = "hola"
 
