@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from infrastructure.adapters.agent.gemini_llm_adapter import GeminiLLMAdapter
 from infrastructure.adapters.agent.mock_llm_adapter import MockLLMAdapter
 from infrastructure.adapters.in_memory_chat_repository import InMemoryChatRepository
+from infrastructure.adapters.tools.search_cv_tool import SearchCVTool
 from infrastructure.api.v1.chat_router import router as chat_router
 from infrastructure.config.settings import settings
 
@@ -14,7 +15,7 @@ from infrastructure.config.settings import settings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     load_dotenv()
-    print("Loading depedencies with lifespan...")
+    print("Loading dependencies with lifespan...")
     app.state.chat_repository = InMemoryChatRepository()
     
     api_key = os.getenv("GEMINI_API_KEY")
@@ -23,6 +24,16 @@ async def lifespan(app: FastAPI):
     else:
         app.state.llm_service = MockLLMAdapter(bot_name=settings.BOT_NAME)
     
+    tools = []
+    if api_key and (os.getenv("PINECONE_KEY") or settings.PINECONE_KEY):
+        try:
+            search_cv_tool = SearchCVTool()
+            tools.append(search_cv_tool)
+            print("Registered search_cv tool.")
+        except Exception as e:
+            print(f"Warning: Could not initialize search_cv tool: {e}")
+    app.state.tools = tools
+
     yield
     print("Closing application...")
 
