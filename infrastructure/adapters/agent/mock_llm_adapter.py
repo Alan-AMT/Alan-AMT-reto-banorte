@@ -15,7 +15,7 @@ class MockLLMAdapter(LLMServicePort):
         history: List[ChatMessage],
         tools: Optional[List[ToolPort]] = None,
         trace_id: Optional[str] = None,
-        telemetry_service: Optional[Any] = None,
+        telemetry_service: Optional[any] = None,
     ) -> str:
         history_len = len(history)
         tools_count = len(tools) if tools else 0

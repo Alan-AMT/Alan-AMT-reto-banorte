@@ -100,7 +100,7 @@ class GeminiLLMAdapter(LLMServicePort):
         tools: Optional[list[ToolPort]] = None,
         max_iterations: int = 10,
         trace_id: Optional[str] = None,
-        telemetry_service: Optional[Any] = None,
+        telemetry_service: Optional[any] = None,
     ) -> str:
         import time
         self._ensure_client()
