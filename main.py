@@ -8,6 +8,7 @@ from infrastructure.adapters.agent.gemini_llm_adapter import GeminiLLMAdapter
 from infrastructure.adapters.agent.mock_llm_adapter import MockLLMAdapter
 from infrastructure.adapters.in_memory_chat_repository import InMemoryChatRepository
 from infrastructure.adapters.tools.search_cv_tool import SearchCVTool
+from infrastructure.adapters.gemini_input_guardrail import GeminiInputGuardrail
 from infrastructure.api.v1.chat_router import router as chat_router
 from infrastructure.config.settings import settings
 
@@ -21,6 +22,7 @@ async def lifespan(app: FastAPI):
     api_key = os.getenv("GEMINI_API_KEY")
     if api_key:
         app.state.llm_service = GeminiLLMAdapter(api_key=api_key)
+        app.state.input_guardrail = GeminiInputGuardrail(api_key=api_key)
     else:
         app.state.llm_service = MockLLMAdapter(bot_name=settings.BOT_NAME)
     
