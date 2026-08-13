@@ -1,7 +1,10 @@
+import json
 import time
 import uuid
-from typing import cast
+import asyncio
+from typing import cast, AsyncGenerator
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import StreamingResponse
 
 from application.dtos.chat_dto import ChatRequestDTO
 from application.dtos.openresponses_dto import (
@@ -21,10 +24,161 @@ from infrastructure.api.dependencies import get_send_chat_message_use_case, veri
 
 router = APIRouter(prefix="/v1/responses", tags=["OpenResponses"])
 
+async def generate_sse_events(
+    full_response: OpenResponsesResponse, 
+    chat_resp_text: str, 
+    msg_id: str
+) -> AsyncGenerator[str, None]:
+    seq = 0
+    
+    def format_event(event_type: str, data: dict) -> str:
+        # Use model_dump for Pydantic v2 or dict() if data has pydantic models inside
+        return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
+
+    # 1. response.created
+    resp_created = full_response.model_dump(mode="json")
+    resp_created["status"] = "in_progress"
+    resp_created["output"] = []
+    
+    yield format_event(
+        "response.created",
+        {
+            "type": "response.created",
+            "sequence_number": seq,
+            "response": resp_created
+        }
+    )
+    seq += 1
+
+    # 2. response.output_item.added
+    yield format_event(
+        "response.output_item.added",
+        {
+            "type": "response.output_item.added",
+            "sequence_number": seq,
+            "output_index": 0,
+            "item": {
+                "type": "message",
+                "id": msg_id,
+                "status": "in_progress",
+                "role": "assistant",
+                "content": []
+            }
+        }
+    )
+    seq += 1
+
+    # 3. response.content_part.added
+    yield format_event(
+        "response.content_part.added",
+        {
+            "type": "response.content_part.added",
+            "sequence_number": seq,
+            "item_id": msg_id,
+            "output_index": 0,
+            "content_index": 0,
+            "part": {
+                "type": "output_text",
+                "text": "",
+                "annotations": []
+            }
+        }
+    )
+    seq += 1
+
+    # 4. response.output_text.delta (loop)
+    words = chat_resp_text.split(" ")
+    for i, word in enumerate(words):
+        chunk = word if i == 0 else " " + word
+        yield format_event(
+            "response.output_text.delta",
+            {
+                "type": "response.output_text.delta",
+                "sequence_number": seq,
+                "item_id": msg_id,
+                "output_index": 0,
+                "content_index": 0,
+                "delta": chunk,
+                "logprobs": []
+            }
+        )
+        seq += 1
+        await asyncio.sleep(0.01)
+
+    # 5. response.output_text.done
+    yield format_event(
+        "response.output_text.done",
+        {
+            "type": "response.output_text.done",
+            "sequence_number": seq,
+            "item_id": msg_id,
+            "output_index": 0,
+            "content_index": 0,
+            "text": chat_resp_text
+        }
+    )
+    seq += 1
+
+    # 6. response.content_part.done
+    yield format_event(
+        "response.content_part.done",
+        {
+            "type": "response.content_part.done",
+            "sequence_number": seq,
+            "item_id": msg_id,
+            "output_index": 0,
+            "content_index": 0,
+            "part": {
+                "type": "output_text",
+                "text": chat_resp_text,
+                "annotations": []
+            }
+        }
+    )
+    seq += 1
+
+    # 7. response.output_item.done
+    yield format_event(
+        "response.output_item.done",
+        {
+            "type": "response.output_item.done",
+            "sequence_number": seq,
+            "output_index": 0,
+            "item": {
+                "type": "message",
+                "id": msg_id,
+                "status": "completed",
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "output_text",
+                        "text": chat_resp_text,
+                        "annotations": []
+                    }
+                ]
+            }
+        }
+    )
+    seq += 1
+
+    # 8. response.completed
+    yield format_event(
+        "response.completed",
+        {
+            "type": "response.completed",
+            "sequence_number": seq,
+            "response": full_response.model_dump(mode="json")
+        }
+    )
+    seq += 1
+
+    # 9. [DONE]
+    yield "data: [DONE]\n\n"
+
 
 @router.post(
     "",
-    response_model=OpenResponsesResponse,
+    response_model=None, # Changed to None because it can return StreamingResponse or OpenResponsesResponse
     status_code=status.HTTP_200_OK,
     summary="Generate a response using OpenResponses format",
     dependencies=[Depends(verify_api_key)],
@@ -32,22 +186,10 @@ router = APIRouter(prefix="/v1/responses", tags=["OpenResponses"])
 async def generate_response(
     request: OpenResponsesRequest,
     use_case: SendChatMessageUseCase = Depends(get_send_chat_message_use_case),
-) -> OpenResponsesResponse:
-    if request.stream:
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="Streaming is not implemented in this version",
-        )
-
+):
     # 1. Map input to ChatRequestDTO
-    # input can be string or list. We only support string in this iteration.
     input_text = request.input if isinstance(request.input, str) else str(request.input)
     
-    # If instructions are provided, we prepend them to the message or handle them appropriately.
-    # The existing use case just takes a user message. For now we will append instructions if provided
-    # so they form part of the prompt context, or just pass the input. The spec says treat instructions
-    # as an override/addition to system instructions. Since our ChatRequestDTO only takes a message,
-    # we can inject it there if needed.
     message_content = input_text
     if request.instructions:
         message_content = f"Instructions: {request.instructions}\n\n{input_text}"
@@ -75,16 +217,16 @@ async def generate_response(
         )
 
     completed_at = int(time.time())
+    msg_id = f"msg_{uuid.uuid4().hex}"
 
     # 3. Map Response to OpenResponsesResponse
     output_message = Message(
-        id=f"msg_{uuid.uuid4().hex}",
+        id=msg_id,
         status="completed",
         role="assistant",
         content=[OutputTextContent(text=chat_resp.response, type="output_text")]
     )
 
-    # Calculate tokens if available
     input_tokens = 0
     output_tokens = 0
     total_tokens = 0
@@ -101,7 +243,7 @@ async def generate_response(
         output_tokens_details=OutputUsageDetails(reasoning_tokens=0),
     )
 
-    return OpenResponsesResponse(
+    full_response = OpenResponsesResponse(
         id=f"resp_{uuid.uuid4().hex}",
         object="response",
         created_at=created_at,
@@ -116,3 +258,11 @@ async def generate_response(
         temperature=request.temperature if request.temperature is not None else 1.0,
         top_p=request.top_p if request.top_p is not None else 1.0
     )
+
+    if request.stream:
+        return StreamingResponse(
+            generate_sse_events(full_response, chat_resp.response, msg_id),
+            media_type="text/event-stream"
+        )
+    
+    return full_response
