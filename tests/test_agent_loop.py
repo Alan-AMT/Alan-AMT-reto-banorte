@@ -1,4 +1,7 @@
 import pytest
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from domain.entities.chat import ChatMessage, Role
 from domain.ports.tool_port import ToolPort
 from infrastructure.adapters.agent.mock_llm_adapter import MockLLMAdapter

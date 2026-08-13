@@ -37,3 +37,16 @@ async def get_trace_by_id(
             detail=f"Trace with ID '{trace_id}' not found.",
         )
     return trace.to_dict()
+
+
+@router.delete(
+    "/traces",
+    status_code=status.HTTP_200_OK,
+    summary="Clear all in-memory telemetry execution traces",
+)
+async def clear_all_traces(
+    telemetry_service: TelemetryPort = Depends(get_telemetry_service),
+):
+    telemetry_service.clear_traces()
+    return {"status": "success", "message": "All traces cleared"}
+

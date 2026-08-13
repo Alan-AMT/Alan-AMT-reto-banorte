@@ -44,3 +44,8 @@ class TelemetryPort(ABC):
     def get_trace(self, trace_id: str) -> Optional[TraceRecord]:
         """Retrieves a specific trace by trace_id."""
         pass
+
+    @abstractmethod
+    def clear_traces(self) -> None:
+        """Clears all stored trace records."""
+        pass
