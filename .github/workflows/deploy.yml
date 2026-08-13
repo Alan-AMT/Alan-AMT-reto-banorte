@@ -70,3 +70,4 @@ jobs:
           secrets: |
             GEMINI_API_KEY=GEMINI_API_KEY:latest
             PINECONE_KEY=PINECONE_KEY:latest
+            API_KEY=API_KEY:latest
