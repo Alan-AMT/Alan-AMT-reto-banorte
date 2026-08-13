@@ -1,0 +1,36 @@
+# Exclude git & github configs
+.git/
+.gitignore
+.github/
+
+# Exclude non-runtime environment & secrets
+.env
+.env.*
+.venv/
+env/
+venv/
+
+# Exclude python build / cache artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
+
+# Exclude non-runtime project directories (as requested)
+rag_content/
+scripts/
+tests/
+
+# Exclude OS & Editor files
+.DS_Store
+.vscode/
+.idea/
+
+# Exclude Docker & docs
+Dockerfile
+.dockerignore
+README.md
