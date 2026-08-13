@@ -1,7 +1,10 @@
 from domain.ports.input_guardrail import InputGuardrail
 from typing import List
 # pyrefly: ignore [missing-import]
-from fastapi import Depends, Request
+import os
+from fastapi import Depends, Request, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
 
 from application.use_cases.chat_use_case import SendChatMessageUseCase
 from domain.ports.chat_repository_port import ChatRepositoryPort
@@ -48,3 +51,14 @@ def get_send_chat_message_use_case(
     )
 
 
+security = HTTPBearer()
+
+def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
+    expected_api_key = os.getenv("API_KEY")
+    if not expected_api_key or credentials.credentials != expected_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing API Key",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return credentials.credentials

@@ -9,9 +9,12 @@ from infrastructure.adapters.agent.mock_llm_adapter import MockLLMAdapter
 from infrastructure.adapters.in_memory_chat_repository import InMemoryChatRepository
 from infrastructure.adapters.tools.search_cv_tool import SearchCVTool
 from infrastructure.adapters.gemini_input_guardrail import GeminiInputGuardrail
+from infrastructure.adapters.mock_input_guardrail import MockInputGuardrail
+
 from infrastructure.adapters.in_memory_telemetry_adapter import InMemoryTelemetryAdapter
 from infrastructure.api.v1.chat_router import router as chat_router
 from infrastructure.api.v1.telemetry_router import router as telemetry_router
+from infrastructure.api.v1.responses_router import router as responses_router
 from infrastructure.config.settings import settings
 
 
@@ -28,6 +31,8 @@ async def lifespan(app: FastAPI):
         app.state.input_guardrail = GeminiInputGuardrail(api_key=api_key)
     else:
         app.state.llm_service = MockLLMAdapter(bot_name=settings.BOT_NAME)
+        app.state.input_guardrail = MockInputGuardrail()
+
     
     tools = []
     if api_key and (os.getenv("PINECONE_KEY") or settings.PINECONE_KEY):
@@ -65,6 +70,8 @@ app.include_router(chat_router, prefix=settings.API_V1_STR)
 
 app.include_router(telemetry_router)
 app.include_router(telemetry_router, prefix=settings.API_V1_STR)
+
+app.include_router(responses_router)
 
 
 

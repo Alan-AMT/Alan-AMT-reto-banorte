@@ -84,3 +84,7 @@ class InMemoryTelemetryAdapter(TelemetryPort):
 
     def get_trace(self, trace_id: str) -> Optional[TraceRecord]:
         return self._traces.get(trace_id)
+
+    def clear_traces(self) -> None:
+        self._traces.clear()
+

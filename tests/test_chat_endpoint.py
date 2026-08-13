@@ -1,4 +1,5 @@
-from fastapi.testclient import TestClient
+# from fastapi.testclient import TestClient
+from starlette.testclient import TestClient as TestClient
 import pytest
 
 from main import app
