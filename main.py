@@ -9,7 +9,9 @@ from infrastructure.adapters.agent.mock_llm_adapter import MockLLMAdapter
 from infrastructure.adapters.in_memory_chat_repository import InMemoryChatRepository
 from infrastructure.adapters.tools.search_cv_tool import SearchCVTool
 from infrastructure.adapters.gemini_input_guardrail import GeminiInputGuardrail
+from infrastructure.adapters.in_memory_telemetry_adapter import InMemoryTelemetryAdapter
 from infrastructure.api.v1.chat_router import router as chat_router
+from infrastructure.api.v1.telemetry_router import router as telemetry_router
 from infrastructure.config.settings import settings
 
 
@@ -18,6 +20,7 @@ async def lifespan(app: FastAPI):
     load_dotenv()
     print("Loading dependencies with lifespan...")
     app.state.chat_repository = InMemoryChatRepository()
+    app.state.telemetry_service = InMemoryTelemetryAdapter()
     
     api_key = os.getenv("GEMINI_API_KEY")
     if api_key:
@@ -56,9 +59,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include Chat Router at root /chat and /api/v1/chat
+# Include Routers at root and /api/v1
 app.include_router(chat_router)
 app.include_router(chat_router, prefix=settings.API_V1_STR)
+
+app.include_router(telemetry_router)
+app.include_router(telemetry_router, prefix=settings.API_V1_STR)
+
 
 
 @app.get("/health", tags=["Health"])

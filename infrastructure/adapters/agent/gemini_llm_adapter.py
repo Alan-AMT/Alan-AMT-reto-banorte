@@ -99,7 +99,10 @@ class GeminiLLMAdapter(LLMServicePort):
         history: list[ChatMessage],
         tools: Optional[list[ToolPort]] = None,
         max_iterations: int = 10,
+        trace_id: Optional[str] = None,
+        telemetry_service: Optional[Any] = None,
     ) -> str:
+        import time
         self._ensure_client()
 
         user_message = ChatMessage(role=Role.USER, content=prompt)
@@ -175,6 +178,7 @@ class GeminiLLMAdapter(LLMServicePort):
         """
 
         for iteration in range(max_iterations):
+            start_llm = time.perf_counter()
             response = await self.client.aio.models.generate_content(
                 model=self.model_name,
                 config=types.GenerateContentConfig(
@@ -187,6 +191,24 @@ class GeminiLLMAdapter(LLMServicePort):
                 ),
                 contents=contents,
             )
+            llm_latency_ms = (time.perf_counter() - start_llm) * 1000.0
+
+            # Record telemetry for Gemini API call
+            if trace_id and telemetry_service and hasattr(response, "usage_metadata") and response.usage_metadata:
+                from domain.entities.telemetry import TokenUsage
+                u = response.usage_metadata
+                prompt_toks = u.prompt_token_count or 0
+                comp_toks = u.candidates_token_count or 0
+                tot_toks = u.total_token_count or (prompt_toks + comp_toks)
+                telemetry_service.record_llm_execution(
+                    trace_id=trace_id,
+                    tokens=TokenUsage(
+                        prompt_tokens=prompt_toks,
+                        completion_tokens=comp_toks,
+                        total_tokens=tot_toks,
+                    ),
+                    latency_ms=llm_latency_ms,
+                )
 
             if not response.candidates or not response.candidates[0].content or not response.candidates[0].content.parts:
                 raise ValueError("Empty response received from Google Gemini API.")
@@ -205,12 +227,33 @@ class GeminiLLMAdapter(LLMServicePort):
                 if not tool:
                     raise ValueError(f"Herramienta no encontrada: {call.name}")
 
-                # 3. Ejecutar la herramienta manualmente
+                # 3. Ejecutar la herramienta manualmente y medir latencia
+                tool_start = time.perf_counter()
+                tool_error = None
+                tool_success = True
                 try:
                     result = await tool.run(**call.args)
                 except Exception as e:
+                    tool_success = False
+                    tool_error = str(e)
                     print(f"Error al ejecutar tool {call.name}: {e}")
                     result = f"Error al ejecutar la herramienta {call.name}: {str(e)}"
+
+                tool_latency_ms = (time.perf_counter() - tool_start) * 1000.0
+
+                if trace_id and telemetry_service:
+                    from domain.entities.telemetry import ToolCallRecord
+                    telemetry_service.record_tool_execution(
+                        trace_id=trace_id,
+                        tool_data=ToolCallRecord(
+                            tool_name=call.name,
+                            args=dict(call.args),
+                            result_summary=str(result)[:200],
+                            latency_ms=tool_latency_ms,
+                            success=tool_success,
+                            error=tool_error,
+                        ),
+                    )
 
                 # 4. Construir la respuesta de la función para el modelo (rol context)
                 res_dict = result if isinstance(result, dict) else {"result": result}

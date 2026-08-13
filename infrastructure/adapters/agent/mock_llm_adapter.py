@@ -14,10 +14,22 @@ class MockLLMAdapter(LLMServicePort):
         prompt: str,
         history: List[ChatMessage],
         tools: Optional[List[ToolPort]] = None,
+        trace_id: Optional[str] = None,
+        telemetry_service: Optional[Any] = None,
     ) -> str:
         history_len = len(history)
         tools_count = len(tools) if tools else 0
+
+        if trace_id and telemetry_service:
+            from domain.entities.telemetry import TokenUsage
+            telemetry_service.record_llm_execution(
+                trace_id=trace_id,
+                tokens=TokenUsage(prompt_tokens=15, completion_tokens=25, total_tokens=40),
+                latency_ms=10.0,
+            )
+
         return (
             f"[{self.bot_name}] Recibí tu mensaje: '{prompt}'. "
             f"Tienes {history_len} mensajes previos y {tools_count} herramientas disponibles."
         )
+
