@@ -29,11 +29,16 @@ class GeminiInputGuardrail(InputGuardrail):
             )
 
     async def evaluate_prompt(self, prompt: str) -> GuardrailResult:
+        import time
+        start_time = time.perf_counter()
+
         if len(prompt) > 2000:
+            latency_ms = (time.perf_counter() - start_time) * 1000.0
             return GuardrailResult(
                 blocked=True,
                 category="prompt-injection",
                 block_message=BLOCK_MESSAGES["prompt-injection"],
+                latency_ms=latency_ms,
             )
 
         self._ensure_client()
@@ -106,6 +111,16 @@ class GeminiInputGuardrail(InputGuardrail):
                 ),
                 contents=prompt,
             )
+        latency_ms = (time.perf_counter() - start_time) * 1000.0
+        prompt_tokens = 0
+        completion_tokens = 0
+        total_tokens = 0
+
+        if hasattr(response, "usage_metadata") and response.usage_metadata:
+            prompt_tokens = response.usage_metadata.prompt_token_count or 0
+            completion_tokens = response.usage_metadata.candidates_token_count or 0
+            total_tokens = response.usage_metadata.total_token_count or (prompt_tokens + completion_tokens)
+
         try:
             parsed_data: GuardrailResult = response.parsed
         except Exception:
@@ -117,5 +132,9 @@ class GeminiInputGuardrail(InputGuardrail):
         return GuardrailResult(
             blocked=parsed_data.blocked,
             category=category,
-            block_message=block_message
+            block_message=block_message,
+            latency_ms=latency_ms,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
         )

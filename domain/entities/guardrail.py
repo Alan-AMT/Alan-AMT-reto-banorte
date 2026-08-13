@@ -32,3 +32,8 @@ class GuardrailResult:
     blocked: bool
     category: Optional[BlockedCategory]
     block_message: str
+    latency_ms: float = 0.0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
