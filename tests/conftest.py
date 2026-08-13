@@ -7,3 +7,4 @@ def mock_env():
     # rather than making real external API calls during testing.
     os.environ["GEMINI_API_KEY"] = ""
     os.environ["PINECONE_KEY"] = ""
+    os.environ["API_KEY"] = ""
