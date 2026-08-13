@@ -194,6 +194,8 @@ async def generate_response(
     if request.instructions:
         message_content = f"Instructions: {request.instructions}\n\n{input_text}"
 
+    print(request)
+
     chat_req = ChatRequestDTO(
         message=message_content,
         session_id=request.previous_response_id
