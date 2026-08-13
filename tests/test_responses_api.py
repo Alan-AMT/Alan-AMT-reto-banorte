@@ -72,7 +72,7 @@ def test_responses_with_previous_session(auth_headers):
         data2 = response2.json()
         assert data2["previous_response_id"] == session_id
 
-def test_responses_streaming_not_implemented(auth_headers):
+def test_responses_streaming_success(auth_headers):
     payload = {
         "model": "test",
         "input": "Hola",
@@ -80,6 +80,19 @@ def test_responses_streaming_not_implemented(auth_headers):
     }
     with TestClient(app) as client:
         response = client.post("/v1/responses", json=payload, headers=auth_headers)
-        assert response.status_code == 501
-        assert response.json()["detail"] == "Streaming is not implemented in this version"
+        assert response.status_code == 200
+        assert "text/event-stream" in response.headers["content-type"]
+        
+        decoded_lines = [line.strip() for line in response.iter_lines() if line.strip()]
+        
+        # Verify event presence and ordering
+        assert "event: response.created" in decoded_lines
+        assert "event: response.output_item.added" in decoded_lines
+        assert "event: response.content_part.added" in decoded_lines
+        assert any(line.startswith("event: response.output_text.delta") for line in decoded_lines)
+        assert "event: response.output_text.done" in decoded_lines
+        assert "event: response.content_part.done" in decoded_lines
+        assert "event: response.output_item.done" in decoded_lines
+        assert "event: response.completed" in decoded_lines
+        assert "data: [DONE]" in decoded_lines
 
