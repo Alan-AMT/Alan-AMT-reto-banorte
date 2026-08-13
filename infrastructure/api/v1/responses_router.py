@@ -213,8 +213,6 @@ async def generate_response(
     if request.instructions:
         message_content = f"Instructions: {request.instructions}\n\n{input_text}"
 
-    print(request)
-
     session_id = request.previous_response_id
     if session_id and session_id.startswith("resp_"):
         session_id = session_id[5:]
