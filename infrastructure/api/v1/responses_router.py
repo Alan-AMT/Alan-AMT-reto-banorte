@@ -188,7 +188,26 @@ async def generate_response(
     use_case: SendChatMessageUseCase = Depends(get_send_chat_message_use_case),
 ):
     # 1. Map input to ChatRequestDTO
-    input_text = request.input if isinstance(request.input, str) else str(request.input)
+    if isinstance(request.input, str):
+        input_text = request.input
+    elif isinstance(request.input, list):
+        texts = []
+        for msg in request.input:
+            if isinstance(msg, dict):
+                content = msg.get("content")
+                if isinstance(content, list):
+                    for part in content:
+                        if isinstance(part, dict) and "text" in part:
+                            texts.append(part["text"])
+                        elif isinstance(part, str):
+                            texts.append(part)
+                elif isinstance(content, str):
+                    texts.append(content)
+            elif isinstance(msg, str):
+                texts.append(msg)
+        input_text = " ".join(texts) if texts else str(request.input)
+    else:
+        input_text = str(request.input)
     
     message_content = input_text
     if request.instructions:
@@ -196,9 +215,13 @@ async def generate_response(
 
     print(request)
 
+    session_id = request.previous_response_id
+    if session_id and session_id.startswith("resp_"):
+        session_id = session_id[5:]
+
     chat_req = ChatRequestDTO(
         message=message_content,
-        session_id=request.previous_response_id
+        session_id=session_id
     )
 
     created_at = int(time.time())
@@ -245,14 +268,16 @@ async def generate_response(
         output_tokens_details=OutputUsageDetails(reasoning_tokens=0),
     )
 
+    response_id = f"resp_{chat_resp.session_id}"
+
     full_response = OpenResponsesResponse(
-        id=f"resp_{uuid.uuid4().hex}",
+        id=response_id,
         object="response",
         created_at=created_at,
         completed_at=completed_at,
         status="completed",
         model=request.model or "default",
-        previous_response_id=chat_resp.session_id,
+        previous_response_id=response_id,
         instructions=request.instructions or "",
         output=[output_message],
         usage=usage,
