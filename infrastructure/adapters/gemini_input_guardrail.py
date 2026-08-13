@@ -29,6 +29,13 @@ class GeminiInputGuardrail(InputGuardrail):
             )
 
     async def evaluate_prompt(self, prompt: str) -> GuardrailResult:
+        if len(prompt) > 2000:
+            return GuardrailResult(
+                blocked=True,
+                category="prompt-injection",
+                block_message=BLOCK_MESSAGES["prompt-injection"],
+            )
+
         self._ensure_client()
         response = await self.client.aio.models.generate_content(
                 model=self.model_name,
